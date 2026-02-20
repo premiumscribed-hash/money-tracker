@@ -1,43 +1,36 @@
-            <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Money Tracker Pro (Private)</title>
+    <title>Cloud Money Tracker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: sans-serif; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 15px; margin: 0; }
-        #auth-error { display: none; text-align: center; margin-top: 50px; color: #e53935; }
-        #app-content { display: none; } /* ပထမဆုံးမှာ App ကို ဖျောက်ထားမယ် */
-        
-        /* အရင် Style တွေအတိုင်း ပြန်ထည့်ထားပါတယ် */
         .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h2 { color: #248bcf; margin: 0; }
         input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 12px; background: #248bcf; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        button { width: 100%; padding: 12px; background: #248bcf; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; border-left: 5px solid #248bcf; display: flex; justify-content: space-between; align-items: center; }
-        .btn-delete { background: #e53935; padding: 5px 10px; font-size: 12px; border-radius: 5px; color: white; border:none; }
+        .item-info div { font-weight: bold; }
         .date-text { font-size: 11px; color: #888; }
+        .btn-delete { background: #e53935; padding: 5px 10px; font-size: 12px; border-radius: 5px; color: white; border:none; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="auth-error">
-        <h2>ဝင်ရောက်ခွင့်မရှိပါ</h2>
-        <p>ဤ App ကို အသုံးပြုရန် သင့်အား ခွင့်ပြုထားခြင်း မရှိပါ။</p>
-    </div>
-
-    <div id="app-content">
+    <div id="app">
         <div class="card">
             <p>စုစုပေါင်း လက်ကျန်ငွေ</p>
-            <h2 id="total-balance">0 ကျပ်</h2>
+            <h2 id="total-balance">Loading...</h2>
         </div>
 
         <div class="card">
             <h3>စာရင်းအသစ်ထည့်ရန်</h3>
             <input type="number" id="amount" placeholder="ပမာဏ">
             <input type="text" id="note" placeholder="အကြောင်းအရာ">
-            <button onclick="addTransaction()">စာရင်းသွင်းမည်</button>
+            <button onclick="saveToCloud()">Cloud ပေါ်သို့ သိမ်းမည်</button>
         </div>
 
         <div id="list"></div>
@@ -47,46 +40,53 @@
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        // --- ဒီနေရာမှာ သုံးခွင့်ပေးမယ့် ID တွေကို ထည့်ပါ ---
-        const allowedUsers = [6371520301, 987654321]; // သင့် ID နဲ့ သူငယ်ချင်း ID တွေကို ဒီမှာကော်မာခြားထည့်ပါ
-        // -------------------------------------------
+        // Supabase Connection (သင့်ရဲ့ URL နဲ့ Key ကို ထည့်ပေးထားပါတယ်)
+        const SUPABASE_URL = 'https://qrfrloeivgpyxjupzgfp.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyZnJsb2VpdmdweXhqdXB6Z2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODE1MjgsImV4cCI6MjA4NzE1NzUyOH0.e0h0i9YEkRJjk_4T-dCyfpf003dftG7PU2CkZdCQVt8';
+        
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const userId = tg.initDataUnsafe?.user?.id;
+        const userId = tg.initDataUnsafe?.user?.id || 12345678;
 
-        // User ID စစ်ဆေးခြင်း
-        if (allowedUsers.includes(userId)) {
-            document.getElementById('app-content').style.display = 'block';
-            updateUI();
-        } else {
-            document.getElementById('auth-error').style.display = 'block';
+        // Cloud မှ စာရင်းများကို ဆွဲယူခြင်း
+        async function fetchTransactions() {
+            const { data, error } = await _supabase
+                .from('transactions')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false });
+
+            if (data) {
+                renderUI(data);
+            } else if (error) {
+                console.log("Error fetching:", error.message);
+            }
         }
 
-        let transactions = JSON.parse(localStorage.getItem('my_money')) || [];
-
-        function updateUI() {
+        function renderUI(transactions) {
             const list = document.getElementById('list');
             const totalDisplay = document.getElementById('total-balance');
             list.innerHTML = '';
             let total = 0;
 
-            [...transactions].reverse().forEach((t, revIndex) => {
-                let index = transactions.length - 1 - revIndex;
+            transactions.forEach((t) => {
                 total += parseInt(t.amount);
                 list.innerHTML += `
                     <div class="item">
-                        <div>
-                            <b>${t.note}</b><br>
+                        <div class="item-info">
+                            <div>${t.note}</div>
                             <span>${t.amount} ကျပ်</span><br>
                             <span class="date-text">${t.date}</span>
                         </div>
-                        <button class="btn-delete" onclick="deleteTransaction(${index})">ဖျက်ရန်</button>
+                        <button class="btn-delete" onclick="deleteFromCloud(${t.id})">ဖျက်ရန်</button>
                     </div>`;
             });
             totalDisplay.innerText = total + " ကျပ်";
-            localStorage.setItem('my_money', JSON.stringify(transactions));
         }
 
-        function addTransaction() {
+        // Cloud ပေါ်သို့ စာရင်းသိမ်းခြင်း
+        async function saveToCloud() {
             const amount = document.getElementById('amount').value;
             const note = document.getElementById('note').value;
             if(!amount || !note) return alert("ဖြည့်သွင်းပါ");
@@ -94,18 +94,35 @@
             const now = new Date();
             const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)} (${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
 
-            transactions.push({ amount: amount, note: note, date: dateStr });
-            document.getElementById('amount').value = '';
-            document.getElementById('note').value = '';
-            updateUI();
-        }
+            const { error } = await _supabase
+                .from('transactions')
+                .insert([{ user_id: userId, amount: parseInt(amount), note: note, date: dateStr }]);
 
-        function deleteTransaction(index) {
-            if(confirm("ဖျက်မှာ သေချာပါသလား?")) {
-                transactions.splice(index, 1);
-                updateUI();
+            if (!error) {
+                document.getElementById('amount').value = '';
+                document.getElementById('note').value = '';
+                fetchTransactions();
+            } else {
+                alert("သိမ်းမရပါ (RLS ပိတ်ဖို့ လိုပါလိမ့်မည်): " + error.message);
             }
         }
+
+        // Cloud မှ စာရင်းဖျက်ခြင်း
+        async function deleteFromCloud(id) {
+            if(confirm("ဖျက်မှာ သေချာပါသလား?")) {
+                const { error } = await _supabase
+                    .from('transactions')
+                    .delete()
+                    .eq('id', id);
+
+                if (!error) {
+                    fetchTransactions();
+                }
+            }
+        }
+
+        // App စဖွင့်ချိန်မှာ Data ဆွဲယူရန်
+        fetchTransactions();
     </script>
 </body>
 </html>
