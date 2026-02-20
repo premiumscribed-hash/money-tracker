@@ -1,49 +1,66 @@
-<!DOCTYPE html>
+            <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Money Tracker Pro</title>
+    <title>Money Tracker Pro (Private)</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 15px; margin: 0; }
+        #auth-error { display: none; text-align: center; margin-top: 50px; color: #e53935; }
+        #app-content { display: none; } /* ပထမဆုံးမှာ App ကို ဖျောက်ထားမယ် */
+        
+        /* အရင် Style တွေအတိုင်း ပြန်ထည့်ထားပါတယ် */
         .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h2 { color: #248bcf; margin: 0; }
         input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
-        .btn-group { display: flex; gap: 10px; }
-        button { flex: 1; padding: 12px; background: #248bcf; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-delete { background: #e53935; }
-        .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #248bcf; }
-        .item-info { flex-grow: 1; }
-        .item-info div { font-weight: bold; }
-        .date-text { font-size: 11px; color: #888; margin-top: 4px; display: block; }
-        .item-actions { display: flex; gap: 5px; }
-        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 5px; }
+        button { width: 100%; padding: 12px; background: #248bcf; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; border-left: 5px solid #248bcf; display: flex; justify-content: space-between; align-items: center; }
+        .btn-delete { background: #e53935; padding: 5px 10px; font-size: 12px; border-radius: 5px; color: white; border:none; }
+        .date-text { font-size: 11px; color: #888; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <p>စုစုပေါင်း လက်ကျန်ငွေ</p>
-        <h2 id="total-balance">0 ကျပ်</h2>
+
+    <div id="auth-error">
+        <h2>ဝင်ရောက်ခွင့်မရှိပါ</h2>
+        <p>ဤ App ကို အသုံးပြုရန် သင့်အား ခွင့်ပြုထားခြင်း မရှိပါ။</p>
     </div>
 
-    <div class="card">
-        <h3 id="form-title">စာရင်းအသစ်ထည့်ရန်</h3>
-        <input type="number" id="amount" placeholder="ပမာဏ">
-        <input type="text" id="note" placeholder="အကြောင်းအရာ">
-        <input type="hidden" id="edit-index" value="-1">
-        <div class="btn-group">
-            <button id="save-btn" onclick="addTransaction()">စာရင်းသွင်းမည်</button>
-            <button id="cancel-btn" style="display:none; background:#888;" onclick="resetForm()">မလုပ်တော့ပါ</button>
+    <div id="app-content">
+        <div class="card">
+            <p>စုစုပေါင်း လက်ကျန်ငွေ</p>
+            <h2 id="total-balance">0 ကျပ်</h2>
         </div>
-    </div>
 
-    <div id="list"></div>
+        <div class="card">
+            <h3>စာရင်းအသစ်ထည့်ရန်</h3>
+            <input type="number" id="amount" placeholder="ပမာဏ">
+            <input type="text" id="note" placeholder="အကြောင်းအရာ">
+            <button onclick="addTransaction()">စာရင်းသွင်းမည်</button>
+        </div>
+
+        <div id="list"></div>
+    </div>
 
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        
+
+        // --- ဒီနေရာမှာ သုံးခွင့်ပေးမယ့် ID တွေကို ထည့်ပါ ---
+        const allowedUsers = [6371520301, 987654321]; // သင့် ID နဲ့ သူငယ်ချင်း ID တွေကို ဒီမှာကော်မာခြားထည့်ပါ
+        // -------------------------------------------
+
+        const userId = tg.initDataUnsafe?.user?.id;
+
+        // User ID စစ်ဆေးခြင်း
+        if (allowedUsers.includes(userId)) {
+            document.getElementById('app-content').style.display = 'block';
+            updateUI();
+        } else {
+            document.getElementById('auth-error').style.display = 'block';
+        }
+
         let transactions = JSON.parse(localStorage.getItem('my_money')) || [];
 
         function updateUI() {
@@ -57,18 +74,14 @@
                 total += parseInt(t.amount);
                 list.innerHTML += `
                     <div class="item">
-                        <div class="item-info">
-                            <div>${t.note}</div>
-                            <span>${t.amount} ကျပ်</span>
+                        <div>
+                            <b>${t.note}</b><br>
+                            <span>${t.amount} ကျပ်</span><br>
                             <span class="date-text">${t.date}</span>
                         </div>
-                        <div class="item-actions">
-                            <button class="btn-sm" style="background:#4caf50;" onclick="editTransaction(${index})">ပြင်ရန်</button>
-                            <button class="btn-sm btn-delete" onclick="deleteTransaction(${index})">ဖျက်ရန်</button>
-                        </div>
+                        <button class="btn-delete" onclick="deleteTransaction(${index})">ဖျက်ရန်</button>
                     </div>`;
             });
-
             totalDisplay.innerText = total + " ကျပ်";
             localStorage.setItem('my_money', JSON.stringify(transactions));
         }
@@ -76,36 +89,15 @@
         function addTransaction() {
             const amount = document.getElementById('amount').value;
             const note = document.getElementById('note').value;
-            const editIndex = document.getElementById('edit-index').value;
-
             if(!amount || !note) return alert("ဖြည့်သွင်းပါ");
 
-            // ရက်စွဲကို DD/MM/YY format ပြောင်းခြင်း
             const now = new Date();
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = String(now.getFullYear()).slice(-2);
-            const time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            
-            const dateStr = `${day}/${month}/${year} (${time})`;
+            const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)} (${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`;
 
-            if(editIndex == "-1") {
-                transactions.push({ amount: amount, note: note, date: dateStr });
-            } else {
-                transactions[editIndex] = { amount: amount, note: note, date: dateStr };
-            }
-
-            resetForm();
+            transactions.push({ amount: amount, note: note, date: dateStr });
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = '';
             updateUI();
-        }
-
-        function editTransaction(index) {
-            document.getElementById('amount').value = transactions[index].amount;
-            document.getElementById('note').value = transactions[index].note;
-            document.getElementById('edit-index').value = index;
-            document.getElementById('form-title').innerText = "စာရင်းပြင်ဆင်ရန်";
-            document.getElementById('save-btn').innerText = "ပြင်ဆင်ချက်သိမ်းမည်";
-            document.getElementById('cancel-btn').style.display = "block";
         }
 
         function deleteTransaction(index) {
@@ -114,17 +106,6 @@
                 updateUI();
             }
         }
-
-        function resetForm() {
-            document.getElementById('amount').value = '';
-            document.getElementById('note').value = '';
-            document.getElementById('edit-index').value = "-1";
-            document.getElementById('form-title').innerText = "စာရင်းအသစ်ထည့်ရန်";
-            document.getElementById('save-btn').innerText = "စာရင်းသွင်းမည်";
-            document.getElementById('cancel-btn').style.display = "none";
-        }
-
-        updateUI();
     </script>
 </body>
 </html>
