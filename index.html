@@ -16,7 +16,7 @@
         .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #248bcf; }
         .item-info { flex-grow: 1; }
         .item-info div { font-weight: bold; }
-        .date-text { font-size: 11px; color: #888; }
+        .date-text { font-size: 11px; color: #888; margin-top: 4px; display: block; }
         .item-actions { display: flex; gap: 5px; }
         .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 5px; }
     </style>
@@ -52,7 +52,6 @@
             list.innerHTML = '';
             let total = 0;
 
-            // မှတ်တမ်းအသစ်ကို အပေါ်ဆုံးမှာ ပြချင်လို့ reverse လုပ်ထားပါတယ်
             [...transactions].reverse().forEach((t, revIndex) => {
                 let index = transactions.length - 1 - revIndex;
                 total += parseInt(t.amount);
@@ -60,7 +59,7 @@
                     <div class="item">
                         <div class="item-info">
                             <div>${t.note}</div>
-                            <span>${t.amount} ကျပ်</span><br>
+                            <span>${t.amount} ကျပ်</span>
                             <span class="date-text">${t.date}</span>
                         </div>
                         <div class="item-actions">
@@ -81,14 +80,18 @@
 
             if(!amount || !note) return alert("ဖြည့်သွင်းပါ");
 
-            // လက်ရှိအချိန်ကို ယူခြင်း
+            // ရက်စွဲကို DD/MM/YY format ပြောင်းခြင်း
             const now = new Date();
-            const dateStr = now.toLocaleDateString() + " " + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = String(now.getFullYear()).slice(-2);
+            const time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            
+            const dateStr = `${day}/${month}/${year} (${time})`;
 
             if(editIndex == "-1") {
                 transactions.push({ amount: amount, note: note, date: dateStr });
             } else {
-                // Edit လုပ်ရင် ရက်စွဲကို အဟောင်းပဲ ထားချင်ရင် date: transactions[editIndex].date လို့ ပြောင်းနိုင်ပါတယ်
                 transactions[editIndex] = { amount: amount, note: note, date: dateStr };
             }
 
