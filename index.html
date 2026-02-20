@@ -6,34 +6,67 @@
     <title>Money Tracker</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 20px; }
-        .card { background: var(--tg-theme-secondary-bg-color); padding: 15px; border-radius: 10px; margin-bottom: 10px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
-        button { width: 100%; padding: 10px; background: #248bcf; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        body { font-family: sans-serif; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 15px; margin: 0; }
+        .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h3 { margin-top: 0; color: #248bcf; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #248bcf; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .history { margin-top: 20px; }
+        .item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ddd; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h3>လက်ကျန်ငွေ: <span id="balance">0</span> ကျပ်</h3>
+        <p>စုစုပေါင်း လက်ကျန်ငွေ</p>
+        <h2 id="total-balance">0 ကျပ်</h2>
     </div>
+
     <div class="card">
-        <input type="number" id="amount" placeholder="ပမာဏထည့်ပါ">
-        <input type="text" id="note" placeholder="အကြောင်းအရာ (ဥပမာ- ထမင်းဖိုး)">
-        <button onclick="saveData()">စာရင်းသွင်းရန်</button>
+        <h3>စာရင်းအသစ်ထည့်ရန်</h3>
+        <input type="number" id="amount" placeholder="ပမာဏ (ဥပမာ - 5000)">
+        <input type="text" id="note" placeholder="အကြောင်းအရာ (ဥပမာ - နေ့လည်စာ)">
+        <button onclick="addTransaction()">စာရင်းသွင်းမည်</button>
+    </div>
+
+    <div class="history">
+        <h4>ယနေ့မှတ်တမ်းများ</h4>
+        <div id="list"></div>
     </div>
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand(); // App ကို အပြည့်ဖွင့်ရန်
+        tg.expand();
+        
+        let transactions = JSON.parse(localStorage.getItem('my_money')) || [];
 
-        function saveData() {
-            let amt = document.getElementById('amount').value;
-            let note = document.getElementById('note').value;
-            if(amt == "") return alert("ပမာဏထည့်ပါ");
-            
-            // ယာယီအားဖြင့် Alert ပြခြင်း (နောက်ပိုင်း Database နဲ့ ချိတ်ရပါမယ်)
-            alert("သိမ်းဆည်းပြီးပါပြီ: " + amt + " (" + note + ")");
+        function updateUI() {
+            const list = document.getElementById('list');
+            const totalDisplay = document.getElementById('total-balance');
+            list.innerHTML = '';
+            let total = 0;
+
+            transactions.forEach((t) => {
+                total += parseInt(t.amount);
+                list.innerHTML += `<div class="item"><span>${t.note}</span> <b>${t.amount} ကျပ်</b></div>`;
+            });
+
+            totalDisplay.innerText = total + " ကျပ်";
+            localStorage.setItem('my_money', JSON.stringify(transactions));
         }
+
+        function addTransaction() {
+            const amount = document.getElementById('amount').value;
+            const note = document.getElementById('note').value;
+
+            if(!amount || !note) return alert("အချက်အလက် ပြည့်စုံအောင် ဖြည့်ပါ။");
+
+            transactions.push({ amount: amount, note: note });
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = '';
+            updateUI();
+        }
+
+        updateUI(); // အစမှာ စာရင်းဟောင်းတွေ ပြပေးရန်
     </script>
 </body>
 </html>
