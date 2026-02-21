@@ -6,36 +6,46 @@
     <title>Expense Tracker Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <style>
         body { font-family: sans-serif; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 15px; margin: 0; }
-        .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; text-align: center; }
         h2 { margin: 0; color: #f44336; }
         .input-group { background: var(--tg-theme-secondary-bg-color); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; background: white; color: black; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
         button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; margin-top: 5px; }
         .btn-add { background: #248bcf; }
-        .btn-pdf { background: #4caf50; margin-top: 10px; }
-        .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #f44336; }
-        .date-text { font-size: 11px; color: #888; }
-        .btn-delete { background: #555; width: auto; padding: 5px 10px; font-size: 12px; }
+        .btn-pdf { background: #4caf50; }
+        .item { background: white; color: black; padding: 12px; border-radius: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; border-left: 5px solid #f44336; }
         #pdf-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: #222; padding: 20px; border-radius: 15px; width: 85%; text-align: center; border: 1px solid #444; }
-        label { display: block; margin-top: 10px; color: white; font-size: 14px; }
+        .modal-content { background: #222; padding: 20px; border-radius: 15px; width: 85%; }
+        /* PDF အတွက် သီးသန့် Area */
+        #pdf-content { position: absolute; left: -9999px; width: 500px; background: white; color: black; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     </style>
 </head>
 <body>
 
+    <div id="pdf-content">
+        <h2 style="color:black">အသုံးစရိတ် မှတ်တမ်း</h2>
+        <p id="pdf-date-range"></p>
+        <table id="pdf-table">
+            <thead>
+                <tr><th>ရက်စွဲ</th><th>အကြောင်းအရာ</th><th>ပမာဏ</th></tr>
+            </thead>
+            <tbody id="pdf-tbody"></tbody>
+        </table>
+        <h3 id="pdf-total" style="text-align:right"></h3>
+    </div>
+
     <div id="pdf-modal">
         <div class="modal-content">
-            <h3 style="color:white; margin-top:0;">ရက်စွဲရွေးချယ်ပါ (DD/MM/YY)</h3>
-            <label>မှ (Start Date):</label>
+            <h3 style="color:white">ရက်စွဲရွေးချယ်ပါ</h3>
             <input type="date" id="start-date">
-            <label>ထိ (End Date):</label>
             <input type="date" id="end-date">
-            <button class="btn-pdf" onclick="processPDF()">PDF ထုတ်မည်</button>
+            <button class="btn-pdf" onclick="generatePDF()">PDF ပို့မည်</button>
             <button style="background:#666" onclick="closeModal()">ပိတ်မည်</button>
         </div>
     </div>
@@ -47,8 +57,8 @@
     </div>
 
     <div class="input-group">
-        <input type="number" id="amount" placeholder="ကုန်ကျငွေ ပမာဏ">
-        <input type="text" id="note" placeholder="အကြောင်းအရာ (ဥပမာ- ဝက်သား)">
+        <input type="number" id="amount" placeholder="ပမာဏ">
+        <input type="text" id="note" placeholder="အကြောင်းအရာ">
         <button class="btn-add" onclick="saveToCloud()">စာရင်းသွင်းမည်</button>
     </div>
 
@@ -56,12 +66,9 @@
 
     <script>
         let tg = window.Telegram.WebApp;
-        tg.expand();
-
         const SUPABASE_URL = 'https://qrfrloeivgpyxjupzgfp.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFyZnJsb2VpdmdweXhqdXB6Z2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODE1MjgsImV4cCI6MjA4NzE1NzUyOH0.e0h0i9YEkRJjk_4T-dCyfpf003dftG7PU2CkZdCQVt8';
         const BOT_TOKEN = '8250967523:AAFXNxxxXJTnrwObKpOR-dyU49FDudkocQs';
-        
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const userId = tg.initDataUnsafe?.user?.id || 123456;
 
@@ -79,13 +86,7 @@
             list.innerHTML = '';
             data.forEach(t => {
                 total += Math.abs(t.amount);
-                // ပုံမှန်ပြသရန် ရက်စွဲကို DD/MM/YY ပြောင်းခြင်း
-                const d = new Date(t.date);
-                const dateShow = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
-                
-                list.innerHTML += `<div class="item"><div><b>${t.note}</b><br><small class="date-text">${dateShow}</small></div>
-                <div style="text-align: right;"><b style="color: #f44336;">${Math.abs(t.amount)} ကျပ်</b><br>
-                <button class="btn-delete" onclick="deleteItem(${t.id})">ဖျက်ရန်</button></div></div>`;
+                list.innerHTML += `<div class="item"><div><b>${t.note}</b><br><small>${t.date}</small></div><b>${Math.abs(t.amount)}</b></div>`;
             });
             document.getElementById('total-balance').innerText = total + " ကျပ်";
         }
@@ -93,61 +94,41 @@
         async function saveToCloud() {
             const amt = document.getElementById('amount').value;
             const note = document.getElementById('note').value;
-            if(!amt || !note) return alert("ဖြည့်သွင်းပါ");
-            
+            if(!amt || !note) return;
             const now = new Date();
-            const dbDate = now.toISOString().split('T')[0]; // YYYY-MM-DD for database
-
-            const { error } = await _supabase.from('transactions').insert([{ user_id: userId, amount: -Math.abs(amt), note: note, date: dbDate }]);
-            if(!error) { document.getElementById('amount').value = ''; document.getElementById('note').value = ''; fetchTransactions(); }
+            const dbDate = now.toISOString().split('T')[0];
+            await _supabase.from('transactions').insert([{ user_id: userId, amount: -Math.abs(amt), note: note, date: dbDate }]);
+            fetchTransactions();
         }
 
-        async function deleteItem(id) {
-            if(confirm("ဖျက်မှာလား?")) { await _supabase.from('transactions').delete().eq('id', id); fetchTransactions(); }
-        }
-
-        async function processPDF() {
+        async function generatePDF() {
             const start = document.getElementById('start-date').value;
             const end = document.getElementById('end-date').value;
-            if(!start || !end) return alert("ရက်စွဲရွေးပါ");
+            const { data } = await _supabase.from('transactions').select('*').eq('user_id', userId).gte('date', start).lte('date', end);
 
-            const { data } = await _supabase.from('transactions')
-                .select('*')
-                .eq('user_id', userId)
-                .gte('date', start)
-                .lte('date', end)
-                .order('date', { ascending: true });
+            if (!data || data.length === 0) return alert("စာရင်းမရှိပါ");
 
-            if (!data || data.length === 0) return alert("ရွေးချယ်ထားသော ရက်စွဲအတွင်း စာရင်းမရှိပါ။");
-
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-            // မြန်မာစာအတွက် Google Font တစ်ခုကိုလှမ်းယူခြင်း (Standard PDF တွင်မြန်မာစာမရသောကြောင့်ဖြစ်သည်)
-            doc.text(`Expense Report: ${start} to ${end}`, 14, 15);
-            
-            let totalVal = 0;
-            const tableBody = data.map(t => {
-                totalVal += Math.abs(t.amount);
-                return [t.date, t.note, Math.abs(t.amount) + " ကျပ်"];
+            const tbody = document.getElementById('pdf-tbody');
+            tbody.innerHTML = '';
+            let total = 0;
+            data.forEach(t => {
+                total += Math.abs(t.amount);
+                tbody.innerHTML += `<tr><td>${t.date}</td><td>${t.note}</td><td>${Math.abs(t.amount)}</td></tr>`;
             });
-            tableBody.push(['', 'စုစုပေါင်း ကုန်ကျငွေ', totalVal + " ကျပ်"]);
+            document.getElementById('pdf-total').innerText = "စုစုပေါင်း: " + total + " ကျပ်";
+            document.getElementById('pdf-date-range').innerText = `ရက်စွဲ: ${start} မှ ${end} အထိ`;
 
-            doc.autoTable({
-                head: [['နေ့စွဲ', 'အကြောင်းအရာ', 'ပမာဏ']],
-                body: tableBody,
-                startY: 25,
-                styles: { font: 'courier' } // မြန်မာစာပေါ်ရန် အခြေခံ settings
+            const element = document.getElementById('pdf-content');
+            const opt = { margin: 0.5, filename: 'report.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+
+            html2pdf().set(opt).from(element).output('blob').then(blob => {
+                const formData = new FormData();
+                formData.append('chat_id', userId);
+                formData.append('document', blob, 'expense_report.pdf');
+                fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
+                tg.showAlert("PDF ကို Bot ထံ ပို့ပေးလိုက်ပါပြီ။");
+                closeModal();
             });
-
-            const pdfBlob = doc.output('blob');
-            const formData = new FormData();
-            formData.append('chat_id', userId);
-            formData.append('document', pdfBlob, 'expense_report.pdf');
-            
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
-            tg.showAlert("PDF ဖိုင်ကို Bot ထဲသို့ ပို့ပေးလိုက်ပါပြီ။");
-            closeModal();
         }
         fetchTransactions();
     </script>
