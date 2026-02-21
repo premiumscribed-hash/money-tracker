@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Expense Tracker</title>
+    <title>ZM² Expense Tracker Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -25,6 +25,7 @@
             min-height: 100vh;
         }
 
+        /* Header UI */
         .header-card {
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             padding: 25px;
@@ -36,16 +37,6 @@
             overflow: hidden;
         }
 
-        .header-card::before {
-            content: "";
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-        }
-
         h2#total-balance {
             font-size: 32px;
             margin: 10px 0 0;
@@ -53,6 +44,7 @@
             letter-spacing: -1px;
         }
 
+        /* Input Section */
         .input-group {
             background: var(--card-bg);
             backdrop-filter: blur(12px);
@@ -72,13 +64,6 @@
             color: white;
             font-size: 16px;
             box-sizing: border-box;
-            transition: 0.3s;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: rgba(15, 23, 42, 0.9);
         }
 
         button {
@@ -87,27 +72,19 @@
             border: none;
             border-radius: 14px;
             font-weight: bold;
-            font-size: 16px;
             cursor: pointer;
-            transition: transform 0.2s, opacity 0.2s;
+            transition: 0.2s;
         }
 
-        button:active { transform: scale(0.98); }
-
-        .btn-add {
-            background: white;
-            color: var(--bg);
-            margin-top: 10px;
-        }
-
-        .btn-excel {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            backdrop-filter: blur(5px);
+        .btn-add { background: white; color: var(--bg); }
+        .btn-excel { 
+            background: rgba(255, 255, 255, 0.15); 
+            color: white; 
             border: 1px solid rgba(255, 255, 255, 0.2);
             margin-top: 15px;
         }
 
+        /* List Items */
         .item {
             background: var(--card-bg);
             padding: 16px;
@@ -120,20 +97,9 @@
             animation: fadeIn 0.5s ease-out;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .item-info b { font-size: 17px; display: block; margin-bottom: 4px; }
+        .item-info b { font-size: 17px; display: block; }
         .date-text { color: #94a3b8; font-size: 12px; }
-
-        .price-tag {
-            text-align: right;
-            color: #f87171;
-            font-weight: 700;
-            font-size: 16px;
-        }
+        .price-tag { text-align: right; color: #f87171; font-weight: 700; }
 
         .btn-delete {
             background: rgba(239, 68, 68, 0.15);
@@ -145,7 +111,7 @@
             border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
-        /* Modal Styles */
+        /* Modal */
         #modal {
             display: none;
             position: fixed;
@@ -163,6 +129,11 @@
             width: 85%;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -171,11 +142,11 @@
         <div class="modal-content">
             <h3 style="margin: 0 0 20px;">Excel Report ထုတ်ရန်</h3>
             <label style="font-size: 14px; color: #94a3b8;">မှ (Start Date):</label>
-            <input type="date" id="start-date">
+            <input type="date" id="start-date" style="background: #0f172a;">
             <label style="font-size: 14px; color: #94a3b8;">ထိ (End Date):</label>
-            <input type="date" id="end-date">
-            <button style="background: var(--primary);" onclick="generateCSV()">ဖိုင်ထုတ်မည်</button>
-            <button style="background: transparent; border: 1px solid #444; margin-top: 10px;" onclick="closeModal()">ပိတ်မည်</button>
+            <input type="date" id="end-date" style="background: #0f172a;">
+            <button style="background: var(--primary); color: white;" onclick="generateCSV()">📊 ဖိုင်ထုတ်မည်</button>
+            <button style="background: transparent; border: 1px solid #444; margin-top: 10px; color: white;" onclick="closeModal()">ပိတ်မည်</button>
         </div>
     </div>
 
@@ -217,18 +188,19 @@
             let total = 0;
             list.innerHTML = '';
             data.forEach(t => {
-                total += Math.abs(t.amount);
+                const amt = Math.abs(t.amount);
+                total += amt;
                 const d = new Date(t.date);
-                const dateShow = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
+                const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
 
                 list.innerHTML += `
                     <div class="item">
                         <div class="item-info">
                             <b>${t.note}</b>
-                            <span class="date-text">🗓 ${dateShow}</span>
+                            <span class="date-text">🗓 ${dateStr}</span>
                         </div>
                         <div class="price-tag">
-                            -${Math.abs(t.amount)} ကျပ်<br>
+                            -${amt.toLocaleString()} ကျပ်<br>
                             <button class="btn-delete" onclick="deleteItem(${t.id})">ဖျက်ရန်</button>
                         </div>
                     </div>`;
@@ -239,7 +211,7 @@
         async function saveToCloud() {
             const amt = document.getElementById('amount').value;
             const note = document.getElementById('note').value;
-            if(!amt || !note) return tg.HapticFeedback.notificationOccurred('error');
+            if(!amt || !note) return;
             
             const dbDate = new Date().toISOString().split('T')[0];
             const { error } = await _supabase.from('transactions').insert([{ user_id: userId, amount: -Math.abs(amt), note: note, date: dbDate }]);
@@ -270,21 +242,35 @@
 
             if (!data || data.length === 0) return alert("စာရင်းမရှိပါ");
 
-            let csvContent = "\uFEFFDate,Note,Amount\n";
+            // CSV Layout ဆန်းဆန်းလေး
+            let csv = "\uFEFF";
+            csv += "========================================\n";
+            csv += "      ZM² EXPENSE WEEKLY REPORT         \n";
+            csv += `      Period: ${start} to ${end}        \n`;
+            csv += "========================================\n\n";
+            csv += "DATE,DESCRIPTION,AMOUNT (MMK)\n";
+            csv += "----------------------------------------\n";
+
             let total = 0;
             data.forEach(t => {
-                total += Math.abs(t.amount);
-                csvContent += `${t.date},${t.note},${Math.abs(t.amount)}\n`;
+                const a = Math.abs(t.amount);
+                total += a;
+                csv += `${t.date},${t.note},${a}\n`;
             });
-            csvContent += `,,Total: ${total}`;
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            csv += "----------------------------------------\n";
+            csv += `,,TOTAL: ${total} MMK\n`;
+            csv += "========================================\n";
+            csv += "Generated by ZM² Money Tracker App";
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const formData = new FormData();
             formData.append('chat_id', userId);
-            formData.append('document', blob, `Expense_${start}_to_${end}.csv`);
+            formData.append('document', blob, `Report_${start}.csv`);
+            formData.append('caption', `📊 စာရင်းချုပ်ဖိုင် (${start} မှ ${end})`);
 
             fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData });
-            tg.showAlert("CSV ဖိုင်ကို Bot ထံ ပို့ပေးလိုက်ပါပြီ။");
+            tg.showAlert("Excel ဖိုင်ကို Bot ထံ ပို့ပေးလိုက်ပါပြီ။");
             closeModal();
         }
 
