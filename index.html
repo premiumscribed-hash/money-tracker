@@ -1,40 +1,39 @@
-<!DOCTYPE html>
+       <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Money Tracker</title>
+    <title>Expense Tracker Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
     <style>
         body { font-family: sans-serif; background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); padding: 15px; margin: 0; }
-        .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; text-align: center; }
-        h2 { margin: 0; color: #248bcf; }
+        .card { background: var(--tg-theme-secondary-bg-color); padding: 20px; border-radius: 12px; margin-bottom: 15px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { margin: 0; color: #e53935; }
         .input-group { background: var(--tg-theme-secondary-bg-color); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
-        .btn-box { display: flex; gap: 10px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; }
-        .btn-add { background: #248bcf; }
-        .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .income { border-left: 5px solid #4caf50; color: #4caf50; }
-        .expense { border-left: 5px solid #e53935; color: #e53935; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; margin-top: 5px; }
+        .btn-add { background: #e53935; }
+        .btn-pdf { background: #4caf50; margin-top: 10px; }
+        .item { background: var(--tg-theme-secondary-bg-color); padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #e53935; }
         .date-text { font-size: 11px; color: #888; }
+        .btn-delete { background: #555; width: auto; padding: 5px 10px; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <p>လက်ကျန်ငွေစုစုပေါင်း</p>
+        <p>စုစုပေါင်း အသုံးစရိတ်</p>
         <h2 id="total-balance">0 ကျပ်</h2>
+        <button class="btn-pdf" onclick="generatePDF()">PDF ထုတ်ယူမည်</button>
     </div>
 
     <div class="input-group">
-        <input type="number" id="amount" placeholder="ပမာဏ">
-        <input type="text" id="note" placeholder="အကြောင်းအရာ">
-        <select id="type">
-            <option value="expense">ထွက်ငွေ (-)</option>
-            <option value="income">ဝင်ငွေ (+)</option>
-        </select>
+        <input type="number" id="amount" placeholder="ကုန်ကျငွေ ပမာဏ">
+        <input type="text" id="note" placeholder="အကြောင်းအရာ (ဥပမာ- ထမင်းဖိုး)">
         <button class="btn-add" onclick="saveToCloud()">စာရင်းသွင်းမည်</button>
     </div>
 
@@ -49,9 +48,14 @@
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const userId = tg.initDataUnsafe?.user?.id || 123456;
 
+        let currentData = [];
+
         async function fetchTransactions() {
             const { data } = await _supabase.from('transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-            if (data) renderUI(data);
+            if (data) {
+                currentData = data;
+                renderUI(data);
+            }
         }
 
         function renderUI(data) {
@@ -59,14 +63,16 @@
             let total = 0;
             list.innerHTML = '';
             data.forEach(t => {
-                const isExpense = t.amount < 0;
-                total += t.amount;
+                total += Math.abs(t.amount);
                 list.innerHTML += `
-                    <div class="item ${isExpense ? 'expense' : 'income'}">
+                    <div class="item">
                         <div>
                             <b>${t.note}</b><br><small class="date-text">${t.date}</small>
                         </div>
-                        <b>${isExpense ? '' : '+'}${t.amount} ကျပ်</b>
+                        <div style="text-align: right;">
+                            <b style="color: #e53935;">${Math.abs(t.amount)} ကျပ်</b><br>
+                            <button class="btn-delete" onclick="deleteItem(${t.id})">ဖျက်ရန်</button>
+                        </div>
                     </div>`;
             });
             document.getElementById('total-balance').innerText = total + " ကျပ်";
@@ -75,21 +81,45 @@
         async function saveToCloud() {
             const amt = document.getElementById('amount').value;
             const note = document.getElementById('note').value;
-            const type = document.getElementById('type').value;
             if(!amt || !note) return alert("ဖြည့်သွင်းပါ");
 
-            let finalAmt = type === 'expense' ? -Math.abs(amt) : Math.abs(amt);
             const now = new Date();
             const dateStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear().toString().slice(-2)}`;
 
-            const { error } = await _supabase.from('transactions').insert([{ user_id: userId, amount: finalAmt, note: note, date: dateStr }]);
+            const { error } = await _supabase.from('transactions').insert([{ user_id: userId, amount: -Math.abs(amt), note: note, date: dateStr }]);
             if(!error) {
                 document.getElementById('amount').value = '';
                 document.getElementById('note').value = '';
                 fetchTransactions();
             }
         }
+
+        async function deleteItem(id) {
+            if(confirm("ဤစာရင်းကို ဖျက်မှာ သေချာပါသလား?")) {
+                const { error } = await _supabase.from('transactions').delete().eq('id', id);
+                if(!error) fetchTransactions();
+            }
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.text("Expense Report", 14, 15);
+            
+            const tableData = currentData.map(t => [t.date, t.note, Math.abs(t.amount) + " MMK"]);
+            
+            doc.autoTable({
+                head: [['Date', 'Note', 'Amount']],
+                body: tableData,
+                startY: 20
+            });
+            
+            doc.save("expense_report.pdf");
+        }
+
         fetchTransactions();
     </script>
 </body>
 </html>
+             
